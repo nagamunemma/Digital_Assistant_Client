@@ -1128,13 +1128,18 @@ if (typeof UDAPluginSDK === 'undefined') {
 			}
 
 			// remove added tooltips before invoking
-			let tooltipnodes = $('.uda-tooltip');
+			// let tooltipnodes = $('.uda-tooltip');
+			let tooltipnodes = document.getElementsByClassName('uda-tooltip');
 			if (tooltipnodes.length > 0) {
 				$('.uda-tooltip').each(function() {
+					$(this).find('.uda-tooltip-text-content').remove();
 					$(this).removeClass('uda-tooltip');
-					$(this).find('.uda-tooltip-right').remove();
 				});
 			}
+
+			$('.uda-tooltip-text-content').each(function() {
+				$(this).remove();
+			});
 
 			this.simulateHover(node);
 
@@ -1277,7 +1282,7 @@ if (typeof UDAPluginSDK === 'undefined') {
 
 			this.playNextAction = false;
 
-			if(enableIntroJs) {
+			/*if(enableIntroJs) {
 				this.introjs.addStep({
 					element: tooltipnode,
 					intro: message,
@@ -1290,7 +1295,7 @@ if (typeof UDAPluginSDK === 'undefined') {
 					invokingnode.click();
 				}
 				return;
-			}
+			}*/
 
 			if(navigationcookiedata && navigationcookiedata.autoplay) {
 				this.autoplay = false;
@@ -1300,18 +1305,52 @@ if (typeof UDAPluginSDK === 'undefined') {
 				this.showselectedrow(navigationcookiedata.data,navigationcookiedata.data.id, true, navigationcookiedata);
 			}
 
-			var html = 	'<div class="uda-tooltip-right">'
-						+'	<div class="uda-tooltip-text-content">'
-						+message
-						+'	</div>'
-						+'	<button class="uda-tutorial-btn" style="margin-bottom:10px;" type="button" uda-added="true" onclick="UDAPluginSDK.resumePlay();">Continue</button>'
+			/*var html = 	'<div class="">'
+				+'<div class="uda-tooltip-text-content uda-tooltip-right">'
+				+message
+				+ '<br/>'
+				+'	<button class="uda-tutorial-btn" style="margin-top:10px;" type="button" uda-added="true" onclick="UDAPluginSDK.resumePlay();">Continue</button>'
+				+'	</div>'
+				+'</div>';*/
+
+			/**
+			 * calculating node position from here
+			 */
+			let toolTipLayerSection	=	message
+										+'<br/>'
+										+'<button class="uda-tutorial-btn" style="margin-top:10px;" type="button" uda-added="true" onclick="UDAPluginSDK.resumePlay();">Continue</button>'
+										+'<button class="uda-tutorial-exit-btn" style="margin-top:10px;" type="button" uda-added="true" id="uda-autoplay-exit">Exit</button>';
+
+			// let toolTipElement = jQuery(toolTipLayerSection);
+			let toolTipElement = document.createElement('div');
+			toolTipElement.innerHTML = toolTipLayerSection.trim();
+			toolTipElement.classList.add('uda-tooltip-text-content');
+
+			tooltipnode.classList.add('uda-tooltip');
+			tooltipnode.appendChild(toolTipElement);
+
+			let toolTipPosistionClass = this.getNodePosition(tooltipnode, toolTipElement);
+
+			toolTipElement.classList.add(toolTipPosistionClass);
+
+			jQuery("#uda-autoplay-exit").click(function () {
+				UDAPluginSDK.backToSearchResultsPage(navigationcookiedata);
+			});
+
+			console.log(toolTipPosistionClass);
+			// return;
+
+			var toolTipHtml = 	'<div>'
+						+toolTipElement
 						+'</div>';
+			// let toolTipHtmlElement = jQuery(toolTipHtml);
+			// $(toolTipHtmlElement).addClass(toolTipPosistionClass);
 
 			$('html, body').animate({
-				scrollTop: ($(invokingnode).offset().top - 200)
+				scrollTop: ($(invokingnode).offset().top - 250)
 			}, 2000, function(){
-				$(tooltipnode).addClass('uda-tooltip')
-				$(tooltipnode).append(html);
+				// $(tooltipnode).addClass('uda-tooltip')
+				// $(tooltipnode).append(html);
 				if(enableFocus){
 					invokingnode.focus();
 				}
@@ -1319,6 +1358,92 @@ if (typeof UDAPluginSDK === 'undefined') {
 					invokingnode.click();
 				}
 			});
+		},
+		/**
+		 * tooltip placement calculation
+		 */
+		getScreenSize: function() {
+			let page = {height: 0, width: 0};
+			let screen = {height: 0, width: 0};
+			let body = document.body,
+				html = document.documentElement;
+
+			const docEl = document.documentElement;
+			const scrollTop = window.pageYOffset || docEl.scrollTop || body.scrollTop;
+			const scrollLeft = window.pageXOffset || docEl.scrollLeft || body.scrollLeft;
+
+			page.height = Math.max( body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight );
+			page.width = Math.max(body.scrollWidth, body.offsetWidth, html.clientWidth, html.scrollWidth, html.offsetWidth);
+			if (window.innerWidth !== undefined) {
+				screen.width = window.innerWidth * 0.75;
+				screen.height = window.innerHeight;
+				// return { width: (window.innerWidth*0.75), height: window.innerHeight };
+			} else {
+				const D = document.documentElement;
+				screen.width = D.clientWidth;
+				screen.height = D.clientHeight * 0.75;
+				// return { width: D.clientWidth*0.75, height: D.clientHeight };
+			}
+			let windowProperties = {page: page, screen: screen, scrollTop: scrollTop, scrollLeft: scrollLeft};
+			return windowProperties;
+		},
+		//get tooltip position on the page
+		getTooltipPosition: function(element, windowSize) {
+			const x = element.getBoundingClientRect();
+			let result = {
+				top: x.top + windowSize.scrollTop,
+				width: x.width,
+				height: x.height,
+				left: x.left + windowSize.scrollLeft,
+				actualPos: x
+			};
+			return result;
+		},
+		getNodePosition: function (targetElement, tooltipElement) {
+			const availablePositions = ["right", "top", "left", "bottom"].slice();
+
+			const screenSize = this.getScreenSize();
+			const tooltipPos = this.getTooltipPosition(tooltipElement, screenSize);
+			const targetElementRect = targetElement.getBoundingClientRect();
+
+			let finalCssClass = "right";
+
+			if(this.logLevel>1) {
+				console.log(screenSize);
+				console.log(tooltipPos);
+				console.log(targetElementRect);
+			}
+
+			// Check for space to the right
+			if (targetElementRect.right + tooltipPos.width > screenSize.screen.width) {
+				this.removeFromArray(availablePositions, "right");
+			}
+
+			// Check for space above
+			if (targetElementRect.top - tooltipPos.height < 0) {
+				this.removeFromArray(availablePositions, "top");
+			}
+
+			// Check for space to the left
+			if (targetElementRect.left - tooltipPos.width < 0) {
+				this.removeFromArray(availablePositions, "left");
+			}
+
+			// Check for space below
+			if (targetElementRect.bottom + tooltipPos.height > screenSize.page.height) {
+				this.removeFromArray(availablePositions, "bottom");
+			}
+
+			if (availablePositions.length > 0) {
+				finalCssClass = availablePositions[0];
+			}
+
+			return 'uda-tooltip-'+finalCssClass;
+		},
+		removeFromArray: function(array, value) {
+			if (array.includes(value)) {
+				array.splice(array.indexOf(value), 1);
+			}
 		},
 		//Continue functionality invoke
 		resumePlay: function(){
@@ -2370,13 +2495,27 @@ if (typeof UDAPluginSDK === 'undefined') {
 			}
 			jQuery("#uda-backto-search").click(function () {
 				// UDAPluginSDK.toggleautoplay(navcookiedata);
-				UDAPluginSDK.autoplay = false;
-				UDAPluginSDK.searchInProgress=false;
-				UDAPluginSDK.autoplayPaused=false;
-				UDAPluginSDK.playNextAction=true;
-				UDAPluginSDK.configureintrojs();
-				UDAPluginSDK.introjs.refresh();
-				UDAPluginSDK.backtosearchresults(navcookiedata);
+				UDAPluginSDK.backToSearchResultsPage(navcookiedata);
+			});
+		},
+		backToSearchResultsPage: function(navcookiedata){
+			UDAPluginSDK.autoplay = false;
+			UDAPluginSDK.searchInProgress=false;
+			UDAPluginSDK.autoplayPaused=false;
+			UDAPluginSDK.playNextAction=true;
+			UDAPluginSDK.configureintrojs();
+			UDAPluginSDK.introjs.refresh();
+			UDAPluginSDK.backtosearchresults(navcookiedata);
+			let tooltipnodes = document.getElementsByClassName('uda-tooltip');
+			if (tooltipnodes.length > 0) {
+				$('.uda-tooltip').each(function() {
+					$(this).find('.uda-tooltip-text-content').remove();
+					$(this).removeClass('uda-tooltip');
+				});
+			}
+
+			$('.uda-tooltip-text-content').each(function() {
+				$(this).remove();
 			});
 		},
 		//showing the sequence steps html
